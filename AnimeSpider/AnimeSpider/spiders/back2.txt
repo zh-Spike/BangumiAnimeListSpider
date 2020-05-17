@@ -1,0 +1,46 @@
+# -*- coding: utf-8 -*-
+
+from scrapy import Request
+from scrapy.spiders import Spider
+from AnimeSpider.items import BGM_SpiderItem
+import re
+
+class BGM_Spider(Spider):
+    name = 'BGM_Spider'
+    start_urls = {
+        'http://bgm.tv/anime/browser?sort=rank'
+        }
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/53.0.2785.143 Safari/537.36',
+    }
+
+    def start_requests(self):
+        url = 'http://bgm.tv/anime/browser?sort=rank'
+        yield Request(url, headers=self.headers)
+
+    def parse(self, response):
+        item = BGM_SpiderItem()
+        movie = response.xpath('//div[@class="section"]/ul/li/div[@class="inner"]')
+        print('=============================================')
+        list = range(0,24)
+        for i in list:
+
+            summary_url = 'http://bgm.tv' + movie.xpath('.//h3/a/@href').extract()[i]
+            yield Request(url = summary_url,meta={'item':item},callback = self.detail_parse)
+
+        
+
+        next_url = response.xpath('.//div[@class="clearit"]/div[@class="page_inner"]/a[@class="p"]/@href').extract()[-2]
+        if next_url:
+            next_url = 'http://bgm.tv/anime/browser' + next_url
+            yield Request(next_url)
+
+    def detail_parse(self, response):
+       
+        item['director'] = page_inner.xpath('.//div/ul/li/text()').extract()[2]
+
+        yield item
+        
+    
+
+        
