@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-
+from scrapy.loader import ItemLoader
 from scrapy import Request
 from scrapy.spiders import Spider
 from AnimeSpider.items import BGM_SpiderItem
@@ -17,62 +17,52 @@ class BGM_Spider(Spider):
 
     def start_requests(self):
         url = 'http://bgm.tv/anime/browser?sort=rank'
-
         yield Request(url, headers=self.headers)
 
     def parse(self, response):
-        movies = response.xpath('//div[@class="section"]/ul/li/div[@class="inner"]')
-        print('=============================================')
-
+        movies = response.xpath(
+            '//div[@class="section"]/ul/li/div[@class="inner"]')
         for movie in movies:
+            AnimeItemLoader = ItemLoader(
+                item=BGM_SpiderItem(), response=response)
+            #用item方法，放上级目录爬取总会到第4页会出现缺失，
+            #而使用Itemload读取数据并不会缺失
+            summary_url = 'http://bgm.tv' + \
+                movie.xpath('.//h3/a/@href').extract()[0]
+            yield Request(url=summary_url, meta={'item': AnimeItemLoader.load_item()}, callback=self.detail_parse, dont_filter=True)
 
-            item = BGM_SpiderItem()
-
-            item['ranking'] = movie.xpath(
-                './/span[@class="rank"]/text()').extract()[0]
-            item['score'] = movie.xpath(
-                './/p/small/text()').extract()[0]
-            item['score_num'] = re.findall(r'\d+',movie.xpath(
-                './/p/span[@class="tip_j"]/text()').extract()[0])
-            item['Tip'] = re.sub('\s','',movie.xpath(
-                './/p[@class="info tip"]/text()').extract()[0])
-
-            summary_url = 'http://bgm.tv' + movie.xpath('.//h3/a/@href').extract()[0]
-
-            yield Request(url=summary_url, meta={'item': item}, callback=self.detail_parse)
-            # yield item
-
-        next_url = response.xpath('.//div[@class="clearit"]/div[@class="page_inner"]/a[@class="p"]/@href').extract()[-2]
+        next_url = response.xpath(
+            './/div[@class="clearit"]/div[@class="page_inner"]/a[@class="p"]/@href').extract()[-2]
+        #一个巧妙的翻页技巧，利用了py数组的特性
         if next_url:
             next_url = 'http://bgm.tv/anime/browser' + next_url
-            
-            yield Request(next_url)
+            yield Request(next_url, callback=self.parse)
 
     def detail_parse(self, response):
+        NextAnimeItemLoader = ItemLoader(
+            item=response.meta['item'], response=response)
 
-        item = response.meta['item']
-               
-        pageA_inner = response.xpath(
-            '///body[@class="bangumi"]/div[@id="wrapperNeue"]/div[@class="mainWrapper"]/div[@class="columns clearit"]/div[@id="columnSubjectHomeA"]/div[@id="bangumiInfo"]')
-        pageB_inner = response.xpath(
-            './/body[@class="bangumi"]/div[@id="wrapperNeue"]/div[@class="mainWrapper"]/div[@class="columns clearit"]/div[@id="columnSubjectHomeB"]/div[@class="subject_section"]')
-        
-    
-        item['summary'] =re.sub('\s','',str(response.xpath(
-            './/*[@id="subject_summary"]/text()').extract()[0]))
-        item['movie_name'] = response.xpath(
-            '//body[@class="bangumi"]/div[@id="wrapperNeue"]/div[@id="headerSubject"]/h1/a/text()').extract()[0]
-        item['chinese_name']= pageA_inner.xpath(
-            './/div/ul/li/text()').extract()[0]
-        item['episode'] = pageA_inner.xpath(
-            './/div/ul/li/text()').extract()[1]
-        
-        item['content'] = re.sub('\s','',str(pageB_inner.xpath(
-            './/div[@class="content_inner clearit"]/div[@id="entry_list"]/div[@class="item clearit"]/div[@class="entry"]/div[@class="content"]/text()').extract()[0]))
-        
-        return item
+        NextAnimeItemLoader.add_xpath(
+            'summary', '//*[@id="subject_summary"]/text()')
+        NextAnimeItemLoader.add_xpath(
+            'movie_name', '//body[@class="bangumi"]/div[@id="wrapperNeue"]/div[@id="headerSubject"]/h1/a/text()')
+        NextAnimeItemLoader.add_xpath(
+            'chinese_name', '/html/body/div[1]/div[4]/div[1]/div[1]/div[1]/div/ul/li', re='中文名: (.*)')
+        NextAnimeItemLoader.add_xpath(
+            'episode', '/html/body/div[1]/div[4]/div[1]/div[1]/div[1]/div/ul/li', re='话数: (.*)')
+        NextAnimeItemLoader.add_xpath(
+            'ranking', '/html/body/div[1]/div[4]/div[1]/div[2]/div[1]/div[2]/div[1]/div/div[1]/div[2]/div/small[2]', re='\d+')
+        NextAnimeItemLoader.add_xpath(
+            'score', '/html/body/div[1]/div[4]/div[1]/div[2]/div[1]/div[2]/div[1]/div/div[1]/div[2]/span[1]', re='\d.\d+')
+        NextAnimeItemLoader.add_xpath(
+            'score_num', '/html/body/div[1]/div[4]/div[1]/div[2]/div[1]/div[2]/div[1]/div/div[3]/div/small/span', re='\d+')
+        NextAnimeItemLoader.add_xpath(
+            'director', '/html/body/div[1]/div[4]/div[1]/div[1]/div[1]/div/ul/li', re='导演: (.*)')
+        NextAnimeItemLoader.add_xpath(
+            'tv_time', '/html/body/div[1]/div[4]/div[1]/div[1]/div[1]/div/ul/li', re='放送开始: (.*)')
+        NextAnimeItemLoader.add_xpath(
+            'week', '/html/body/div[1]/div[4]/div[1]/div[1]/div[1]/div/ul/li', re='放送星期: (.*)')
+        NextAnimeItemLoader.add_xpath(
+            'movie_time', '/html/body/div[1]/div[4]/div[1]/div[1]/div[1]/div/ul/li', re='上映年度: (.*)')
 
-
-
-
-
+        return NextAnimeItemLoader.load_item()
