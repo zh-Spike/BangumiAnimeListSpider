@@ -12,5 +12,5 @@ use scrapy to get the basic information.
 * 使用pyechart和worldcloud实现数据可视化。
   
 ## Todo
-* 数据清洗对value_counts()还存在一定问题
-* 从v2开始放弃了多级页面的Itemloader对评论爬取，存在数据串行,原理和summar部分应该没差?
+* 数据清洗对value_counts()还存在一定问题y
+* 从v2开始放弃了多级页面的Itemloader对评论爬取，存在数据串行,原理和summary部分应该没差?
